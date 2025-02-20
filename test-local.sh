@@ -40,10 +40,17 @@ echo "Aggregated result:"
 cat output.txt
 
 # Stop the app and its JVM
-echo -e "\nStopping the app and its JVM (PID: $APP_PID)..."
+printf "\n"
+echo "Stopping the app and its JVM (PID: $APP_PID)..."
 kill -9 $APP_PID 2>/dev/null || true
-# Kill all Java processes
-ps -eo pid,comm | grep -v grep | grep java | awk '{print $1}' | xargs kill -9 2>/dev/null || true
+# Find and kill the specific JVM running kinesis.Main
+JVM_PID=$(ps -eo pid,args | grep -v grep | grep "java.*com.github.adityak93.kinesis.Main" | awk '{print $1}')
+if [ -n "$JVM_PID" ]; then
+    echo "Killing JVM process (PID: $JVM_PID)..."
+    kill -9 $JVM_PID 2>/dev/null || true
+else
+    echo "No JVM process found for kinesis.Main, assuming already stopped."
+fi
 
 # Wait to ensure all processes terminate
 sleep 2
