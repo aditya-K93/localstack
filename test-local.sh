@@ -43,7 +43,6 @@ cat output.txt
 printf "\n"
 echo "Stopping the app and its JVM (PID: $APP_PID)..."
 kill -9 $APP_PID 2>/dev/null || true
-# Find and kill the specific JVM running kinesis.Main
 JVM_PID=$(ps -eo pid,args | grep -v grep | grep "java.*com.github.adityak93.kinesis.Main" | awk '{print $1}')
 if [ -n "$JVM_PID" ]; then
     echo "Killing JVM process (PID: $JVM_PID)..."
