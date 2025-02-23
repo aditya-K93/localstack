@@ -3,12 +3,13 @@
 
 # Kinesis Aggregator LocalStack Test
 
-LocalStack docker setup with Scala 3 and Cats Effect to test simple kinesis stream aggregation
+LocalStack docker setup with Scala 3 and Cats Effect to test full-fledged kinesis stream aggregation
 
 ## Features
 
 - **Local Testing**: Scripts for running with LocalStack.
-- **Error Handling**: Graceful error logging
+- **Error Handling**: Graceful error logging, retries on disconnects
+- **Concurrency**: Asynchronous processing 
 
 ## Prerequisites
 
@@ -16,7 +17,7 @@ LocalStack docker setup with Scala 3 and Cats Effect to test simple kinesis stre
 - **SBT**: 1.9.x
 - **Docker**: For LocalStack
 - **AWS CLI**: For LocalStack interaction
-- **Java**: 11 (Adoptium recommended)
+- **Java**: 21 (Adoptium recommended)
 
 ## Setup
 
