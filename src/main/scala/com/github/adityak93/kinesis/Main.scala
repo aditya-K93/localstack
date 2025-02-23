@@ -1,6 +1,6 @@
 package com.github.adityak93.kinesis
 
-import cats.{Applicative, Parallel}
+import cats.Parallel
 import cats.effect.{Async, Concurrent, ExitCode, IO, IOApp, Ref, Resource, Spawn, Temporal}
 import cats.syntax.all.*
 import fs2.{text, Stream}
@@ -8,7 +8,8 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Flags, Path}
 import retry.*
 import retry.RetryPolicies.*
-import retry.syntax.all.*
+import retry.syntax._
+import retry.{ResultHandler, RetryDetails}
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 import software.amazon.awssdk.services.kinesis.model.{
   DescribeStreamRequest,
@@ -58,7 +59,7 @@ object KinesisApp:
     def getRecords(shardIterator: String): F[ProcessingResult]
 
   object KinesisClient:
-    private def retryPolicy[F[_]: Applicative]: RetryPolicy[F] =
+    private def retryPolicy[F[_]: Temporal]: RetryPolicy[F, Throwable] =
       exponentialBackoff(100.milliseconds).join(
         limitRetries[F](15)
       )
@@ -66,18 +67,14 @@ object KinesisApp:
     private def logError[F[_]](err: Throwable, details: RetryDetails)(using
         L: Logger[F]
     ): F[Unit] =
-      details match
-        case RetryDetails.GivingUp(totalRetries, totalDelay) =>
+      details.nextStepIfUnsuccessful match
+        case RetryDetails.NextStep.GiveUp =>
           L.error(
-            s"Giving up after $totalRetries retries and ${totalDelay.toSeconds} seconds. Error: ${err.getMessage}"
+            s"Giving up after ${details.retriesSoFar} retries and ${details.cumulativeDelay.toSeconds} seconds. Error: ${err.getMessage}"
           )
-        case RetryDetails.WillDelayAndRetry(
-              nextDelay,
-              retriesSoFar,
-              cumulativeDelay
-            ) =>
+        case RetryDetails.NextStep.DelayAndRetry(nextDelay) =>
           L.warn(
-            s"Failed with ${err.getMessage}. Retried $retriesSoFar times. Next retry in ${nextDelay.toMillis}ms after ${cumulativeDelay.toSeconds}s total delay"
+            s"Failed with ${err.getMessage}. Retried ${details.retriesSoFar} times. Next retry in ${nextDelay.toMillis}ms after ${details.cumulativeDelay.toSeconds}s total delay"
           )
 
     def live[F[_]](
@@ -107,7 +104,10 @@ object KinesisApp:
             )
             _ <- L.info(s"Found ${shards.size} shards")
           } yield shards)
-            .retryingOnAllErrors(policy = retryPolicy, onError = logError)
+            .retryingOnErrors(
+              policy = retryPolicy,
+              errorHandler = ResultHandler.retryOnAllErrors[F, List[String]](logError)
+            )
 
         private def tryGetIterator(streamName: String, shardId: String, seqNum: Option[String]): F[String] =
           F.fromCompletableFuture(
@@ -120,7 +120,7 @@ object KinesisApp:
                     .shardId(shardId)
                     .shardIteratorType(
                       seqNum.fold(
-                        ShardIteratorType.TRIM_HORIZON
+                        ShardIteratorType.LATEST
                       )(_ => ShardIteratorType.AFTER_SEQUENCE_NUMBER)
                     )
                     .startingSequenceNumber(seqNum.orNull)
@@ -154,7 +154,10 @@ object KinesisApp:
                 case e =>
                   F.raiseError(e) // Let other errors be handled by retry policy
               }
-              .retryingOnAllErrors(policy = retryPolicy, onError = logError)
+              .retryingOnErrors(
+                policy = retryPolicy,
+                errorHandler = ResultHandler.retryOnAllErrors[F, String](logError)
+              )
             _ <- L.info(s"Retrieved iterator for shard $shardId")
           } yield iterator
 

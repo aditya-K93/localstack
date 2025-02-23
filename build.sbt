@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
       "org.typelevel" %% "log4cats-slf4j" % "2.7.0",
       "org.slf4j" % "slf4j-api" % "2.0.16",
       "ch.qos.logback" % "logback-classic" % "1.5.16",
-      "com.github.cb372" %% "cats-retry" % "3.1.3",
+      "com.github.cb372" %% "cats-retry" % "4.0.0",
       "org.typelevel" %% "munit-cats-effect-3" % "1.0.7" % Test
     ),
     scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),

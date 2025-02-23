@@ -26,4 +26,4 @@ done
 # Wait for all background processes to complete
 wait
 
-echo "Populated 'my-stream' with 1000 events across multiple shards."
+echo "Populated 'my-stream' with 100 events across ${num_shards} shards."
