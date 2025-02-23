@@ -13,7 +13,7 @@ export AWS_SECRET_ACCESS_KEY=test
 export AWS_REGION=us-east-1
 
 # Create a Kinesis stream
-aws --endpoint-url=http://localhost:4566 kinesis create-stream --stream-name my-stream --shard-count 1
+aws --endpoint-url=http://localhost:4566 kinesis create-stream --stream-name my-stream --shard-count 5
 
 # Wait for the stream to become active
 aws --endpoint-url=http://localhost:4566 kinesis wait stream-exists --stream-name my-stream
