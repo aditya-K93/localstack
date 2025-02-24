@@ -1,7 +1,7 @@
 ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / organization := "com.github.adityak93"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / githubWorkflowJavaVersions += JavaSpec.temurin("17")
+ThisBuild / githubWorkflowJavaVersions += JavaSpec.temurin("21")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq()
 
 lazy val root = (project in file("."))
@@ -19,7 +19,11 @@ lazy val root = (project in file("."))
       "org.slf4j" % "slf4j-api" % "2.0.16",
       "ch.qos.logback" % "logback-classic" % "1.5.16",
       "com.github.cb372" %% "cats-retry" % "4.0.0",
-      "org.typelevel" %% "munit-cats-effect-3" % "1.0.7" % Test
+      "org.typelevel" %% "cats-effect-testkit" % "3.5.7" % Test,
+      "org.typelevel" %% "munit-cats-effect" % "2.0.0-M4" % Test,
+      "org.scalacheck" %% "scalacheck" % "1.17.0" % Test,
+      "org.typelevel" %% "scalacheck-effect" % "2.0.0-M2" % Test,
+      "org.typelevel" %% "scalacheck-effect-munit" % "2.0.0-M2" % Test
     ),
     scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
     fork := true,

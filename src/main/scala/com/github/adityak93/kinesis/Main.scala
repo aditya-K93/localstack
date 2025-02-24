@@ -38,7 +38,8 @@ object KinesisApp:
   final case class Config(
       streamName: String,
       outputFile: String,
-      maxConcurrency: Int = Runtime.getRuntime.availableProcessors() * 2
+      maxConcurrency: Int = Runtime.getRuntime.availableProcessors() * 2,
+      emitFrequency: Int = 10
   )
 
   final case class Event(value: Int)
@@ -204,7 +205,7 @@ object KinesisApp:
             events,
             response.nextShardIterator(),
             lastSeqNum
-          ) // Removed .retryingOnAllErrors
+          )
 
     def resource[F[_]: Async: Parallel: Logger]: Resource[F, KinesisClient[F]] =
       Resource
@@ -337,7 +338,8 @@ object KinesisApp:
 
   def writeSums[F[_]: Async: Files: Logger](
       outputFile: String,
-      stats: Ref[F, RunningStats]
+      stats: Ref[F, RunningStats],
+      emitEvery: Int
   ): Stream[F, Unit] = {
     val path = Path(outputFile)
     val headers = "Timestamp,Count,Sum\n"
@@ -357,7 +359,7 @@ object KinesisApp:
       headerStream ++
         Stream
           .repeatEval(stats.get)
-          .metered(10.seconds)
+          .metered(emitEvery.seconds)
           .evalMap { currentStats =>
             val timestamp =
               LocalDateTime.now().format(formatter)
@@ -392,7 +394,7 @@ object KinesisApp:
         kinesisStream(client, config, stats, errorChannel),
         errorLogger(errorChannel)
       ).parJoin(2)
-        .concurrently(writeSums(config.outputFile, stats))
+        .concurrently(writeSums(config.outputFile, stats, config.emitFrequency))
         .compile
         .drain <* Logger[F].info("Kinesis consumer stopped.")
     }.foreverM
