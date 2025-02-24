@@ -1,7 +1,7 @@
 ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / organization := "com.github.adityak93"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / githubWorkflowJavaVersions += JavaSpec.temurin("21")
+ThisBuild / githubWorkflowJavaVersions += JavaSpec.temurin("17")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq()
 
 lazy val root = (project in file("."))
