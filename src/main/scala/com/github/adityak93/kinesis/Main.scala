@@ -51,6 +51,7 @@ object KinesisApp:
             lastSequenceNumber: Option[String]
         ): F[String]
         def getRecords(shardIterator: String): F[ProcessingResult]
+    end KinesisClient
 
     object KinesisClient:
         private def retryPolicy[F[_]: Temporal]: RetryPolicy[F, Throwable] =
@@ -62,21 +63,21 @@ object KinesisApp:
             using L: Logger[F]
         ): F[Unit] =
             details.nextStepIfUnsuccessful match
-                case RetryDetails.NextStep.GiveUp =>
-                    L.error(
-                      s"Giving up after ${details.retriesSoFar} retries and ${details.cumulativeDelay.toSeconds} seconds. Error: ${err.getMessage}"
-                    )
-                case RetryDetails.NextStep.DelayAndRetry(nextDelay) =>
-                    L.warn(
-                      s"Failed with ${err.getMessage}. Retried ${details.retriesSoFar} times. Next retry in ${nextDelay.toMillis}ms after ${details.cumulativeDelay.toSeconds}s total delay"
-                    )
+            case RetryDetails.NextStep.GiveUp =>
+                L.error(
+                  s"Giving up after ${details.retriesSoFar} retries and ${details.cumulativeDelay.toSeconds} seconds. Error: ${err.getMessage}"
+                )
+            case RetryDetails.NextStep.DelayAndRetry(nextDelay) =>
+                L.warn(
+                  s"Failed with ${err.getMessage}. Retried ${details.retriesSoFar} times. Next retry in ${nextDelay.toMillis}ms after ${details.cumulativeDelay.toSeconds}s total delay"
+                )
 
         def live[F[_]](
             client: KinesisAsyncClient
         )(using F: Async[F], P: Parallel[F], L: Logger[F]): KinesisClient[F] =
             new KinesisClient[F]:
                 def listShards(streamName: String): F[List[String]] =
-                    (for {
+                    (for
                         _ <- L.info(s"Listing shards for stream $streamName")
                         shards <- F.fromCompletableFuture(
                           F.delay(
@@ -90,7 +91,7 @@ object KinesisApp:
                           )
                         )
                         _ <- L.info(s"Found ${shards.size} shards")
-                    } yield shards).retryingOnErrors(
+                    yield shards).retryingOnErrors(
                       policy = retryPolicy,
                       errorHandler = ResultHandler.retryOnAllErrors[F, List[String]](logError)
                     )
@@ -98,7 +99,8 @@ object KinesisApp:
                 private def tryGetIterator(
                     streamName: String,
                     shardId: String,
-                    seqNum: Option[String]): F[String] =
+                    seqNum: Option[String]
+                ): F[String] =
                     F.fromCompletableFuture(
                       F.delay(
                         client
@@ -125,7 +127,7 @@ object KinesisApp:
                     lastSequenceNumber: Option[String]
                 ): F[String] =
 
-                    for {
+                    for
                         _ <- L.info(
                           s"Getting iterator for shard $shardId${lastSequenceNumber
                                   .fold("")(seq => s" after sequence $seq")}"
@@ -155,10 +157,10 @@ object KinesisApp:
                               errorHandler = ResultHandler.retryOnAllErrors[F, String](logError)
                             )
                         _ <- L.info(s"Retrieved iterator for shard $shardId")
-                    } yield iterator
+                    yield iterator
 
                 def getRecords(shardIterator: String): F[ProcessingResult] =
-                    for {
+                    for
                         response <- F
                             .fromCompletableFuture(
                               F.delay(
@@ -173,20 +175,21 @@ object KinesisApp:
                             )
                             .recoverWith {
                                 case error =>
-                                    if (error
-                                          .getMessage
-                                          .contains("The connection was closed") ||
-                                      error
-                                          .getMessage
-                                          .contains(
-                                            "Record for provided SequenceNumber not found")) {
+                                    if error
+                                            .getMessage
+                                            .contains("The connection was closed") ||
+                                        error
+                                            .getMessage
+                                            .contains(
+                                              "Record for provided SequenceNumber not found"
+                                            )
+                                    then
                                         L.warn(
                                           s"Connection error or invalid sequence detected for iterator $shardIterator, will retry from last sequence in loop"
                                         ) *>
                                             Async[F].raiseError(error) // Escalate to loop
-                                    } else {
+                                    else
                                         Async[F].raiseError(error) // Other errors escalate too
-                                    }
                             }
                         records = response.records().asScala.toList
                         events <- records.parTraverse { record =>
@@ -197,10 +200,11 @@ object KinesisApp:
                             F.fromEither(parse(data).flatMap(_.as[Event]))
                                 .handleErrorWith(err =>
                                     Logger[F].error(s"Failed to parse record: $err") *>
-                                        F.pure(Event(0)))
+                                        F.pure(Event(0))
+                                )
                         }
                         lastSeqNum = records.lastOption.map(_.sequenceNumber())
-                    } yield ProcessingResult(
+                    yield ProcessingResult(
                       events,
                       response.nextShardIterator(),
                       lastSeqNum
@@ -242,14 +246,15 @@ object KinesisApp:
                   }
                 )
                 .map(live[F])
+    end KinesisClient
 
     def kinesisStream[F[_]: {Logger, Temporal}](
         client: KinesisClient[F],
         config: Config,
         stats: Ref[F, RunningStats],
         errorChannel: Channel[F, String]
-    ): Stream[F, Unit] = {
-        def makeProcessShard(shardId: String): Stream[F, Unit] = {
+    ): Stream[F, Unit] =
+        def makeProcessShard(shardId: String): Stream[F, Unit] =
             def loop(
                 iterator: String,
                 lastSequenceNumber: Option[String]
@@ -303,7 +308,8 @@ object KinesisApp:
                                       client.getShardIterator(
                                         config.streamName,
                                         shardId,
-                                        lastSequenceNumber)
+                                        lastSequenceNumber
+                                      )
                                 )
                                 .flatMap(newIter => loop(newIter, lastSequenceNumber))
                     }
@@ -319,7 +325,7 @@ object KinesisApp:
                         Stream.eval(Temporal[F].sleep(10.seconds)) *>
                         makeProcessShard(shardId)
                 }
-        }
+        end makeProcessShard
 
         Stream
             .eval(client.listShards(config.streamName))
@@ -332,20 +338,20 @@ object KinesisApp:
                       Temporal[F].sleep(15.seconds)
                 ) *> kinesisStream(client, config, stats, errorChannel)
             }
-    }
+    end kinesisStream
 
     def writeSums[F[_]: {Async, Files, Logger}](
         outputFile: String,
         stats: Ref[F, RunningStats],
         emitEvery: Int
-    ): Stream[F, Unit] = {
+    ): Stream[F, Unit] =
         val path = Path(outputFile)
         val headers = "Timestamp,Count,Sum\n"
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
         Stream.eval(Files[F].exists(path)).flatMap { exists =>
             val headerStream =
-                if (!exists)
+                if !exists then
                     Stream
                         .emit(headers)
                         .through(text.utf8.encode)
@@ -371,7 +377,7 @@ object KinesisApp:
                         )
                 }
         }
-    }
+    end writeSums
 
     def errorLogger[F[_]: {Async, Logger}](
         errorChannel: Channel[F, String]
@@ -379,12 +385,12 @@ object KinesisApp:
         errorChannel.stream.evalMap(msg => Logger[F].error(msg))
 
     def program[F[_]: {Async, Files, Logger, Parallel}]: F[Unit] =
-        (for {
+        (for
             client <- KinesisClient.resource[F]
             stats <- Resource.eval(Ref[F].of(RunningStats(0L, 0L)))
             errorChannel <- Resource.eval(Channel.bounded[F, String](100))
             _ <- Resource.eval(Logger[F].info("Starting Kinesis consumer..."))
-        } yield (client, stats, errorChannel)).use {
+        yield (client, stats, errorChannel)).use {
             case (client, stats, errorChannel) =>
                 val config = Config(streamName = "my-stream", outputFile = "output.txt")
                 Stream(
@@ -395,6 +401,7 @@ object KinesisApp:
                     .compile
                     .drain <* Logger[F].info("Kinesis consumer stopped.")
         }.foreverM
+end KinesisApp
 
 object Main extends IOApp:
     private val logger = org.typelevel.log4cats.slf4j.Slf4jLogger.getLogger[IO]
@@ -407,3 +414,4 @@ object Main extends IOApp:
               error => logger.error(error.getMessage) *> IO.pure(ExitCode.Error),
               _ => IO.pure(ExitCode.Success)
             )
+end Main
