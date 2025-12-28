@@ -21,6 +21,7 @@ lazy val root = (project in file(".")).settings(
     "org.typelevel"         %% "log4cats-slf4j"          % "2.7.0",
     "org.slf4j"              % "slf4j-api"               % "2.0.17",
     "com.github.cb372"      %% "cats-retry"              % "4.0.0",
+    "is.cir"                %% "ciris"                   % "3.6.0",
     "ch.qos.logback"         % "logback-classic"         % "1.5.19",
     "io.netty"               % "netty-codec-http2"       % "4.2.5.Final",
     "io.netty"               % "netty-transport"         % "4.2.5.Final",
