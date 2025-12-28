@@ -78,7 +78,18 @@ localstack/
 │   ├── main/
 │   │   ├── scala/
 │   │   │   └── com/github/adityak93/kinesis/
-│   │   │       └── Main.scala
+│   │   │       ├── app/
+│   │   │       │   ├── AppConfig.scala
+│   │   │       │   └── KinesisApp.scala
+│   │   │       ├── domain/
+│   │   │       │   └── Domain.scala
+│   │   │       ├── kinesis/
+│   │   │       │   └── KinesisClient.scala
+│   │   │       ├── Main.scala
+│   │   │       ├── sink/
+│   │   │       │   └── StatsWriter.scala
+│   │   │       └── stream/
+│   │   │           └── KinesisConsumer.scala
 │   │   └── resources/
 │   │       └── logback.xml
 │   └── test/
